@@ -6,6 +6,9 @@ https://www.sketchappsources.com/free-source/2810-candy-simple-task-management-a
 - iPhone & iPad
 - Portrait & Landscape
 
+[![Watch demo video](https://www.sketchappsources.com/resources/source-image/candy-todo-thisiskuldeep.png)](https://youtu.be/3HzHEm6CWgs)
+
+
 TODO somewhere...
 
 - router
