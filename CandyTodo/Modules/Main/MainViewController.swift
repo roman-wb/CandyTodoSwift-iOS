@@ -9,30 +9,15 @@
 import UIKit
 import SnapKit
 
-final class MainViewController: UITabBarController {
+class TabBar: UITabBar {
 
-    override var selectedIndex: Int {
-        willSet {
-            moveIndicator(index: newValue)
-        }
-    }
+    // MARK: - UI elements
 
-    // MARK: - UI Elements
-
-    private let middleViewController: UIViewController = {
-        let viewController = UIViewController()
-        let image = Constants.Assets.addIcon.image
-        viewController.tabBarItem = UITabBarItem(title: nil, image: image, selectedImage: image)
-        return viewController
+    let middleButton: UIButton = {
+        let button = UIButton()
+        button.setImage(Constants.Assets.addIcon.image, for: .normal)
+        return button
     }()
-
-    private var tabBarButtons: [UIView] {
-        return tabBar.subviews.filter { $0.description.contains("Button") }
-    }
-
-    private var middleTabButton: UIView {
-        return tabBarButtons[2]
-    }
 
     private let indicator: UIView = {
         let view = UIView(frame: .zero)
@@ -41,20 +26,142 @@ final class MainViewController: UITabBarController {
         return view
     }()
 
-    private let addButton: UIButton = {
-        let button = UIButton()
-        button.setImage(Constants.Assets.addIcon.image, for: .normal)
-        return button
+    private var buttons: [UIView] {
+        return subviews.filter { $0.description.contains("UITabBarButton") }
+    }
+
+    // MARK: - Life Cycle
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        setupUI()
+        setupConstraints()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if middleButton.frame.contains(point) {
+            return middleButton
+        } else {
+            return super.hitTest(point, with: event)
+        }
+    }
+
+    // MARK: - SetupUI
+
+    private func setupUI() {
+        addSubview(middleButton)
+        addSubview(indicator)
+
+        if #available(iOS 13.0.0, *) {
+            let appr = UITabBarAppearance()
+            appr.backgroundColor = Constants.Colors.background2
+            appr.shadowColor = .clear
+            for item in [appr.stackedLayoutAppearance, appr.inlineLayoutAppearance, appr.compactInlineLayoutAppearance] {
+                item.normal.iconColor = Constants.Colors.secondary
+                item.selected.iconColor = Constants.Colors.primary
+            }
+            standardAppearance = appr
+        } else {
+            backgroundColor = Constants.Colors.background2
+            shadowImage = UIImage()
+            backgroundImage = UIImage()
+            tintColor = Constants.Colors.primary
+            unselectedItemTintColor = Constants.Colors.secondary
+        }
+    }
+
+    private func setupConstraints() {
+        middleButton.snp.makeConstraints { (make) in
+           make.centerX.equalToSuperview()
+           make.bottom.equalTo(safeAreaLayoutGuide).offset(-10)
+       }
+    }
+
+    // MARK: - UpdateUI
+
+    func updateUI() {
+        updateShadow()
+        updateIconPosition()
+    }
+
+    func updateIndicator(index: Int, duration: TimeInterval = 0.25) {
+        let selectedButton = buttons[index]
+        indicator.frame.size.width = buttons[0].frame.width + 4
+        let point = CGPoint(
+            x: selectedButton.center.x,
+            y: selectedButton.frame.maxY - indicator.frame.height / 2
+        )
+        UIView.animate(withDuration: duration) { [weak self] in
+            guard let self = self else { return }
+
+            self.indicator.center = point
+        }
+    }
+
+    private func updateShadow() {
+        let wh: CGFloat = 40
+        let x = abs(middleButton.frame.width / 2 - wh / 2)
+        let y: CGFloat = 16 + wh / 3
+        let rect = CGRect(x: x, y: y, width: wh, height: wh)
+
+        middleButton.layer.shadowColor = Constants.Colors.primary.cgColor
+        middleButton.layer.shadowPath = UIBezierPath(ovalIn: rect).cgPath
+        middleButton.layer.shadowOpacity = 0.4
+        middleButton.layer.shadowRadius = 8
+    }
+
+    private func updateIconPosition() {
+        if #available(iOS 13, *) {
+            return
+        }
+
+        for item in items ?? [] {
+            // iPhone Any / iOS 11 / Portrait & Landscape
+            item.landscapeImagePhoneInsets.left = -10
+            item.landscapeImagePhoneInsets.right = 10
+
+            // iPad Air / iOS 11 / Portrait & Landscape
+            if traitCollection.userInterfaceIdiom == .pad {
+                item.imageInsets.left = -10
+                item.imageInsets.right = 10
+            }
+        }
+    }
+}
+
+final class MainViewController: UITabBarController {
+
+    // MARK: - UI Elements
+
+    private let customTabBar = TabBar()
+
+    private let middleViewController: UIViewController = {
+        return UIViewController()
     }()
 
     // MARK: - Life Cycle
 
+    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+
+        self.setValue(customTabBar, forKey: "tabBar")
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        delegate = self
+
         setupControllers()
-        setupUI()
-        setupConstraints()
         setupActions()
     }
 
@@ -62,7 +169,8 @@ final class MainViewController: UITabBarController {
         super.viewDidLayoutSubviews()
 
         view.layoutIfNeeded()
-        updateUI()
+        customTabBar.updateIndicator(index: selectedIndex, duration: 0)
+        customTabBar.updateUI()
     }
 
     private func setupControllers() {
@@ -75,103 +183,19 @@ final class MainViewController: UITabBarController {
         ]
     }
 
-    // MARK: - SetupUI
-
-    private func setupUI() {
-        if #available(iOS 13, *) {
-            //
-        } else {
-            // Important! Call after init controller but before modifications tabBar
-            for item in tabBar.items! {
-                // iPhone Any / iOS 11 / Portrait & Landscape
-                item.landscapeImagePhoneInsets.left = -10
-                item.landscapeImagePhoneInsets.right = 10
-
-                // iPad Air / iOS 11 / Portrait & Landscape
-                if UIDevice.current.userInterfaceIdiom == .pad {
-                    item.imageInsets.left = -10
-                    item.imageInsets.right = 10
-                }
-            }
-        }
-
-        middleTabButton.isHidden = true
-        tabBar.addSubview(indicator)
-        delegate = self
-
-        if #available(iOS 13.0.0, *) {
-            let appr = UITabBarAppearance()
-            appr.backgroundColor = Constants.Colors.background2
-            appr.shadowColor = .clear
-            for item in [appr.stackedLayoutAppearance, appr.inlineLayoutAppearance, appr.compactInlineLayoutAppearance] {
-                item.normal.iconColor = Constants.Colors.secondary
-                item.selected.iconColor = Constants.Colors.primary
-            }
-            tabBar.standardAppearance = appr
-        } else {
-            tabBar.backgroundColor = Constants.Colors.background2
-            tabBar.shadowImage = UIImage()
-            tabBar.backgroundImage = UIImage()
-            tabBar.tintColor = Constants.Colors.primary
-            tabBar.unselectedItemTintColor = Constants.Colors.secondary
-        }
-
-        tabBar.addSubview(addButton)
-    }
-
-    private func setupConstraints() {
-        addButton.snp.makeConstraints { (make) in
-            make.centerX.equalToSuperview()
-            make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-10)
-        }
-    }
-
-    private func setupActions() {
-        addButton.addTarget(self, action: #selector(tapAddButton(_:)), for: .touchUpInside)
-    }
-
     // MARK: - Actions
 
+    private func setupActions() {
+//        customTabBar.middleButton.addTarget(self, action: #selector(tapMiddleButton(_:)), for: .touchUpInside)
+    }
+
     @objc
-    private func tapAddButton(_ sender: UIButton) {
+    private func tapMiddleButton(_ sender: UIButton) {
         print(#function)
-        let vc = NewTaskViewController()
-        let navVC = NavigationController(rootViewController: vc)
-        navVC.modalPresentationStyle = .formSheet
-        present(navVC, animated: true)
-    }
-
-    // MARK: - UpdateUI
-
-    private func updateUI() {
-        updateShadow()
-        moveIndicator(index: selectedIndex, duration: 0)
-    }
-
-    private func updateShadow() {
-        let wh: CGFloat = 40
-        let x = abs(addButton.frame.width / 2 - wh / 2)
-        let y: CGFloat = 16 + wh / 3
-        let rect = CGRect(x: x, y: y, width: wh, height: wh)
-
-        addButton.layer.shadowColor = Constants.Colors.primary.cgColor
-        addButton.layer.shadowPath = UIBezierPath(ovalIn: rect).cgPath
-        addButton.layer.shadowOpacity = 0.4
-        addButton.layer.shadowRadius = 8
-    }
-
-    private func moveIndicator(index: Int, duration: TimeInterval = 0.25) {
-        let selectedButton = tabBarButtons[index]
-        indicator.frame.size.width = tabBarButtons[0].frame.width + 4
-        let point = CGPoint(
-            x: selectedButton.center.x,
-            y: selectedButton.frame.maxY - indicator.frame.height / 2
-        )
-        UIView.animate(withDuration: duration) { [weak self] in
-            guard let self = self else { return }
-
-            self.indicator.center = point
-        }
+//        let vc = NewTaskViewController()
+//        let navVC = NavigationController(rootViewController: vc)
+//        navVC.modalPresentationStyle = .formSheet
+//        present(navVC, animated: true)
     }
 }
 
@@ -183,11 +207,11 @@ extension MainViewController: UITabBarControllerDelegate {
             return false
         }
 
-        if viewController == middleViewController {
+        if viewController.isEqual(middleViewController) {
             return false
         }
 
-        moveIndicator(index: index)
+        customTabBar.updateIndicator(index: index)
         return true
     }
 }
