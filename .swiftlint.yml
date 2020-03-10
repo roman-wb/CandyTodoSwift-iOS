@@ -1,0 +1,20 @@
+disabled_rules: # rule identifiers to exclude from running
+  - comma
+  - type_body_length
+excluded: # paths to ignore during linting. Takes precedence over `included`.
+  - Carthage
+line_length: 130
+trailing_comma:
+    mandatory_comma: true
+identifier_name:
+  excluded: # excluded via string array
+    - vc
+    - wh
+    - x
+    - y
+    - TodoData
+    - SchedulerData
+    - NotificationsData
+    - SettingsData
+    - MenuData
+    - PreviewDevices
